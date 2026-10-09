@@ -1,5 +1,5 @@
 # soundcloud-rpc-medexplug
-🎵 A plugin for [soundcloud-rpc](https://github.com/richardhbtz/soundcloud-rpc "soundcloud-rpc") electron client.
+🎵 A media export plugin for [soundcloud-rpc](https://github.com/richardhbtz/soundcloud-rpc "soundcloud-rpc") electron client.
 
 This plugin is a firefox extension that has been converted into a plugin format for the soundcloud rpc client. I have not written this code by myself. It is converted with Claude.
 
