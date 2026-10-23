@@ -2,6 +2,7 @@
 🎵 A media export plugin for [soundcloud-rpc](https://github.com/richardhbtz/soundcloud-rpc "soundcloud-rpc") electron client.
 
 This plugin is a firefox extension that has been converted into a plugin format for the soundcloud rpc client. I have not written this code by myself. It is converted with Claude.
+It is also integrated into my [mini-player](https://github.com/gothmiku/soundcloud-rpc-miniplayerplug "mini-player") plugin written for Soundcloud rpc.
 
 ## Installation
 
