@@ -4,7 +4,7 @@
  * @version 1.16.0-plugin.1
  * @description Adds download buttons and settings to SoundCloud pages.
  * @license MIT
- * @homepage https://github.com/NotTobi/soundcloud-dl
+ * @homepage https://github.com/gothmiku/soundcloud-rpc-medexplug
  */
 
 module.exports = {
@@ -7621,15 +7621,19 @@ module.exports = {
       parent.appendChild(button);
     }
   };
-  var createDownloadCommand = (url) => (downloadId) => {
+  var runUrlDownload = (url, listener) => {
     const pathname = new URL(url).pathname;
     const parts = pathname.split("/").filter(Boolean);
     const set = parts.length >= 2 && parts[parts.length - 2] === "sets";
     return runDownloadRequest(
       { type: set ? "DOWNLOAD_SET" : "DOWNLOAD", url },
-      (progress) => handleDownloadProgress(downloadId, progress)
+      listener
     );
   };
+  var createDownloadCommand = (url) => (downloadId) => runUrlDownload(
+    url,
+    (progress) => handleDownloadProgress(downloadId, progress)
+  );
   var setupDownloadButtons = (ctx, {
     selector,
     getTrackUrl,
@@ -7764,6 +7768,8 @@ module.exports = {
 
   // src/settingsUi.ts
   var SHOW_SETTINGS_BUTTON = true;
+  var MINI_PLAYER_CLASS = "scmp-mini";
+  var isMiniPlayerActive = () => document.documentElement.classList.contains(MINI_PLAYER_CLASS);
   var options = [
     { key: "download-hq-version", label: "Download high quality version (you need to be a GO+ user)" },
     { key: "download-original-version", label: "Download original version when possible (metadata might not be set)" },
@@ -7783,6 +7789,7 @@ module.exports = {
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   }
   .fab:hover, .fab:focus-visible { opacity: 1; }
+  .fab[hidden] { display: none; }
   .fab svg { width: 18px; height: 18px; }
 
   .backdrop {
@@ -7834,6 +7841,7 @@ module.exports = {
       </form>
     </div>
   \`;
+    const fab = root.querySelector(".fab");
     const backdrop = root.querySelector(".backdrop");
     const form = root.querySelector("form");
     const inputs = Array.from(root.querySelectorAll("input[data-key]"));
@@ -7843,11 +7851,12 @@ module.exports = {
       }
     };
     const open = () => {
+      if (isMiniPlayerActive()) return;
       restore();
       backdrop.classList.add("open");
     };
     const close = () => backdrop.classList.remove("open");
-    root.querySelector(".fab")?.addEventListener("click", open);
+    fab?.addEventListener("click", open);
     root.querySelector("[data-action=close]")?.addEventListener("click", close);
     backdrop.addEventListener("mousedown", (event) => {
       if (event.target === backdrop) close();
@@ -7869,6 +7878,16 @@ module.exports = {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && backdrop.classList.contains("open")) close();
     });
+    const syncMiniPlayer = () => {
+      const mini = isMiniPlayerActive();
+      if (fab) fab.hidden = mini;
+      if (mini) close();
+    };
+    new MutationObserver(syncMiniPlayer).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+    syncMiniPlayer();
     document.body.appendChild(host);
     return { open, close };
   }
@@ -7911,6 +7930,29 @@ module.exports = {
     win.document.querySelectorAll("iframe").forEach((i) => watchIframe(i));
     observer.start(win.document.body);
   }
+  function toDownloadUrl(input) {
+    try {
+      const url = new URL(String(input), window.location.origin);
+      if (!/(^|\.)soundcloud\.com$/.test(url.hostname)) return null;
+      return url.origin + url.pathname;
+    } catch {
+      return null;
+    }
+  }
+  function downloadFromUrl(input, onProgress) {
+    const report = (message) => {
+      try {
+        onProgress?.(message);
+      } catch {
+      }
+    };
+    const url = toDownloadUrl(input);
+    if (!url) {
+      report({ error: "This isn't a SoundCloud link.", errorLabel: "Invalid link" });
+      return Promise.resolve();
+    }
+    return runUrlDownload(url, report);
+  }
   function whenDomReady(callback) {
     if (document.readyState === "complete" || document.readyState === "interactive") {
       window.setTimeout(callback, 0);
@@ -7926,6 +7968,7 @@ module.exports = {
     installRequestHooks(window);
     const api = {
       version: "1.16.0-plugin.1",
+      download: downloadFromUrl,
       openSettings: () => api._settings?.open(),
       closeSettings: () => api._settings?.close(),
       getConfig: () => Object.fromEntries(configKeys.map((k) => [k, getConfigValue(k)])),
